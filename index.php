@@ -1,4 +1,13 @@
 <?php
+session_start();
+
+// Gérer la déconnexion avant toute sortie
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: ' . $_SERVER['PHP_SELF']);
+    exit;
+}
+
 $backgroundColorCustom = 'maClasse';
 $number = 2;
 ?>
@@ -245,6 +254,108 @@ $number = 2;
         }
         ?>
     </table>
+
+    <h2>Exercice 14: Liens avec requêtes GET</h2>
+    <p>Faire 2 liens qui envoient à la même page mais avec une requête GET différente :</p>
+
+    <p>
+        <a href="?couleur=rouge">Lien Rouge</a> |
+        <a href="?couleur=bleu">Lien Bleu</a>
+    </p>
+
+    <?php
+    if (isset($_GET['couleur'])) {
+        $couleur = htmlspecialchars($_GET['couleur']);
+        echo "<p style='color: $couleur; font-weight: bold;'>Vous avez cliqué sur le lien $couleur !</p>";
+    }
+    ?>
+
+    <h2>Exercice 15: Upload d'image</h2>
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="img" accept="image/*">
+        <button type="submit" name="upload">Envoyer</button>
+    </form>
+
+    <?php
+    if (isset($_POST['upload']) && $_FILES['img']['error'] === 0) {
+        $f = $_FILES['img'];
+        if (in_array($f['type'], ['image/jpeg', 'image/png', 'image/gif']) && $f['size'] <= 5000000) {
+            if (!is_dir('uploads'))
+                mkdir('uploads', 0777, true);
+            $dest = 'uploads/' . uniqid('img_') . '.' . pathinfo($f['name'], PATHINFO_EXTENSION);
+            if (move_uploaded_file($f['tmp_name'], $dest)) {
+                echo "<p>✓ Image uploadée</p><img src='$dest' style='max-width:300px'>";
+            }
+        } else {
+            echo "<p>✗ Fichier invalide (max 5MB, JPG/PNG/GIF)</p>";
+        }
+    }
+    ?>
+
+    <h2>Exercice 16: Authentification</h2>
+
+    <?php
+    $users = [
+        'admin' => password_hash('admin123', PASSWORD_DEFAULT),
+        'user' => password_hash('pass123', PASSWORD_DEFAULT)
+    ];
+
+    if (isset($_POST['login'])) {
+        if (isset($users[$_POST['username']]) && password_verify($_POST['password'], $users[$_POST['username']])) {
+            $_SESSION['user'] = $_POST['username'];
+            echo "<p>✓ Connecté : {$_POST['username']}</p>";
+        } else {
+            echo "<p>✗ Identifiants incorrects</p>";
+        }
+    }
+    ?>
+
+    <?php if (isset($_SESSION['user'])): ?>
+        <p>Connecté : <strong><?= $_SESSION['user'] ?></strong> | <a href="?logout=1">Déconnexion</a></p>
+    <?php else: ?>
+        <form method="POST">
+            <input type="text" name="username" placeholder="Nom d'utilisateur" required>
+            <input type="password" name="password" placeholder="Mot de passe" required>
+            <button type="submit" name="login">Connexion</button>
+        </form>
+        <p><small>Test : admin/admin123 ou user/pass123</small></p>
+    <?php endif; ?>
+
+    <h2>Exercice 17: Base de données Darty</h2>
+
+    <?php
+    $pdo = new PDO("mysql:host=localhost;dbname=darty;charset=utf8mb4", "root", "");
+
+    // Récupérer les machines avec marques
+    $machines = $pdo->query("SELECT machine.*, marque.nom as marque_nom FROM machine LEFT JOIN marque ON machine.marque_id = marque.id")->fetchAll();
+    ?>
+
+    <form method="GET">
+        <select name="machine_id">
+            <option value="">-- Choisir une machine --</option>
+            <?php foreach ($machines as $m): ?>
+                <option value="<?= $m['id'] ?>" <?= (isset($_GET['machine_id']) && $_GET['machine_id'] == $m['id']) ? 'selected' : '' ?>>
+                    <?= $m['marque_nom'] . ' - ' . $m['modele'] ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit">OK</button>
+    </form>
+
+    <?php
+    if (isset($_GET['machine_id']) && $_GET['machine_id'] != '') {
+        $stmt = $pdo->prepare("SELECT machine.*, marque.nom as marque_nom FROM machine LEFT JOIN marque ON machine.marque_id = marque.id WHERE machine.id = ?");
+        $stmt->execute([$_GET['machine_id']]);
+        $m = $stmt->fetch();
+
+        if ($m) {
+            echo "<p><strong>Marque:</strong> {$m['marque_nom']}<br>";
+            echo "<strong>Modèle:</strong> {$m['modele']}<br>";
+            echo "<strong>Prix:</strong> {$m['prix']} €</p>";
+        }
+    }
+    ?>
 
 </body>
 
